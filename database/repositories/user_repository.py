@@ -8,30 +8,30 @@ class UserRepository:
 
     def find_by_username(self, username: str) -> User | None:
 
-        with self.database.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT
-                        id,
-                        username,
-                        password_hash,
-                        active,
-                        created_at
-                    FROM users
-                    WHERE username = %s
-                    """,
-                    (username,)
-                )
+        conn = self.database.connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    id,
+                    username,
+                    password_hash,
+                    active,
+                    created_at
+                FROM users
+                WHERE username = %s
+                """,
+                (username,)
+            )
 
-                row = cur.fetchone()
+            row = cur.fetchone()
 
-                if not row:
-                    return None
-                return User(
-                    id=row[0],
-                    username=row[1],
-                    password_hash=row[2],
-                    active=row[3],
-                    created_at=row[4]
-                )
+            if not row:
+                return None
+            return User(
+                id=row[0],
+                username=row[1],
+                password_hash=row[2],
+                active=row[3],
+                created_at=row[4]
+            )

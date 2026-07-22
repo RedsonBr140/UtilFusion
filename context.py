@@ -1,4 +1,5 @@
 from PySide6.QtCore import QSettings
+from database.repositories.filial_repository import FilialRepository
 from database.repositories.user_repository import UserRepository
 from fusion import FusionClient
 from database.connection import Database
@@ -12,6 +13,7 @@ class AppContext:
 
         # Repositories
         self.users: UserRepository | None = None
+        self.filiais: FilialRepository | None = None
 
         # Services
         self.auth: AuthService | None = None

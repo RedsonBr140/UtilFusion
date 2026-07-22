@@ -20,3 +20,12 @@ class Filial:
     estado: str
     telefone: str
     created_at: datetime | None = None
+
+
+@dataclass
+class CisspoderConfig:
+    host: str
+    port: str
+    database_name: str
+    username: str
+    password: str

@@ -2,9 +2,10 @@ from PySide6.QtWidgets import QMainWindow, QMdiArea
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, context):
+    def __init__(self, context, settings):
         super().__init__()
         self.context = context
+        self.settings = settings
 
         self.setWindowTitle("UtilFusion")
 
@@ -25,11 +26,13 @@ class MainWindow(QMainWindow):
         cadastro_menu = menu_bar.addMenu("Cadastros")
         cadastro_menu.addAction("&Filiais", self.open_filiais)
         #estoque_menu = menu_bar.addMenu("Estoque")
+        utilitarios_menu = menu_bar.addMenu("Utilitários")
+        utilitarios_menu.addAction("Consulta Pedido Fusion", self.open_consulta_pedido_fusion)
         relatorios_menu = menu_bar.addMenu("&Relatórios")
         ajuda_menu = menu_bar.addMenu("A&juda")
     def open_configurations(self):
         from windows.config_window import ConfigWindow
-        config_window = ConfigWindow()
+        config_window = ConfigWindow(self.context, self.settings)
         self.mdi.addSubWindow(config_window)
         config_window.show()
     
@@ -38,3 +41,9 @@ class MainWindow(QMainWindow):
         filiais_window = FiliaisWindow(self.context)
         self.mdi.addSubWindow(filiais_window)
         filiais_window.show()
+
+    def open_consulta_pedido_fusion(self):
+        from windows.consulta_pedido_fusion_window import ConsultaPedidoFusionWindow
+        consulta = ConsultaPedidoFusionWindow(self.context)
+        self.mdi.addSubWindow(consulta)
+        consulta.show()

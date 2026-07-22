@@ -10,6 +10,7 @@ from context import AppContext
 from database.connection import Database
 from database.repositories.filial_repository import FilialRepository
 from database.repositories.user_repository import UserRepository
+from database.repositories.cisspoder_config_repository import CisspoderConfigRepository
 from services.auth_service import AuthService
 from settings import AppSettings
 from windows.login_window import LoginWindow
@@ -29,6 +30,7 @@ settings = AppSettings()
 context.database = Database(settings.getConnectionUrl())
 context.users = UserRepository(context.database)
 context.filiais = FilialRepository(context.database)
+context.cisspoder_config = CisspoderConfigRepository(context.database)
 context.auth = AuthService(context.users)
 
 login = LoginWindow(context, settings)
@@ -37,10 +39,10 @@ if not settings.getConnectionUrl():
     configurar_url = ConfigurarURLWindow(context, settings)
     configurar_url.exec()
 
-#context.FusionClient = FusionClient(tempfile.gettempdir() + "/fusion_client")
+context.FusionClient = FusionClient(tempfile.gettempdir() + "/fusion_client")
 
 if login.exec() == QDialog.Accepted:
-    main_window = MainWindow(context)
+    main_window = MainWindow(context, settings)
     main_window.show()
 
     sys.exit(app.exec())

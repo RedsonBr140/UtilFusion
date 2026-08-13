@@ -8,11 +8,11 @@ _FETCHERS: dict[str, type[SiteFetcher]] = {
 }
 
 
-def get_fetcher(tipo: str) -> SiteFetcher:
+def get_fetcher(tipo: str, **kwargs) -> SiteFetcher:
     cls = _FETCHERS.get(tipo)
     if cls is None:
         raise ValueError(f"Tipo de concorrente nao suportado: {tipo}")
-    return cls()
+    return cls(**kwargs)
 
 
 def available_tipos() -> list[str]:

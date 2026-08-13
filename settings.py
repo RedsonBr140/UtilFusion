@@ -11,6 +11,18 @@ class AppSettings:
     def getUsername(self):
         return self.settings.value("username", "")
 
+    def setOpenAIKey(self, key):
+        self.settings.setValue("openai/api_key", key)
+
+    def getOpenAIKey(self):
+        return self.settings.value("openai/api_key", "")
+
+    def setOpenAIModel(self, model):
+        self.settings.setValue("openai/model", model)
+
+    def getOpenAIModel(self):
+        return self.settings.value("openai/model", "gpt-4o-mini")
+
     def getConnectionUrl(self):
         if (
             not self.settings.value("database/host", "")

@@ -23,9 +23,10 @@ from windows.app_behaviors import AppSubWindow
 
 
 class CotarSiteConcorrenteWindow(AppSubWindow):
-    def __init__(self, context):
+    def __init__(self, context, settings):
         super().__init__()
         self.context = context
+        self.settings = settings
         self.setWindowTitle("Cotar no site do concorrente")
         self.setMinimumSize(900, 450)
         self._rows = []
@@ -259,7 +260,16 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
             return
 
         try:
-            fetcher = get_fetcher(concorrente.tipo)
+            from services.llm_client import LLMClient
+
+            llm = None
+            if self.settings.getOpenAIKey():
+                llm = LLMClient(
+                    self.settings.getOpenAIKey(),
+                    self.settings.getOpenAIModel(),
+                )
+                print("[Cotar] ChatGPT configurado para apoiar a busca de nomes")
+            fetcher = get_fetcher(concorrente.tipo, llm=llm)
         except ValueError as e:
             QMessageBox.warning(self, "Cotação", str(e))
             return
@@ -267,7 +277,12 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         self.table.setSortingEnabled(False)
         for idx, row in enumerate(self._rows):
             codbar = row["codbar"]
-            result = fetcher.fetch_by_gtin(codbar) if codbar else None
+            descricao = row["descricao"]
+            result = (
+                fetcher.fetch_by_name(descricao, gtin=codbar)
+                if descricao and descricao != "—"
+                else None
+            )
             if result and result.preco is not None and result.preco > 0:
                 row["preco_site"] = result.preco
                 row["fonte"] = result.fonte or concorrente.nome

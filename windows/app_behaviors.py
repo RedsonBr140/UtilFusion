@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMdiSubWindow,
     QPushButton,
+    QSizePolicy,
     QTableView,
     QTableWidget,
     QToolBar,
@@ -93,11 +94,25 @@ def menubar_reserved_mnemonics(widget: QWidget | None = None) -> set[str]:
 
 def configure_table(table: QTableView | QTableWidget) -> None:
     header = table.horizontalHeader()
+    # Resizable columns; last section absorbs leftover width so the table
+    # always spans the full window horizontally.
     header.setSectionResizeMode(QHeaderView.Interactive)
-    header.setStretchLastSection(False)
+    header.setStretchLastSection(True)
     header.setSectionsMovable(True)
     header.setSectionsClickable(True)
     header.setHighlightSections(True)
+    header.setMinimumSectionSize(50)
+    table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    # Make the table take remaining space in its parent layout.
+    parent = table.parentWidget()
+    if parent is not None:
+        parent.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout = parent.layout()
+        if layout is not None:
+            idx = layout.indexOf(table)
+            if idx >= 0:
+                layout.setStretch(idx, max(layout.stretch(idx), 1))
 
 
 def configure_tables(root: QWidget) -> None:

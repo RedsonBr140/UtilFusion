@@ -11,5 +11,5 @@ class ProductPrice:
 
 class SiteFetcher(ABC):
     @abstractmethod
-    def fetch_by_gtin(self, gtin: str) -> ProductPrice | None:
+    def fetch_by_name(self, descricao: str, gtin: str | None = None) -> ProductPrice | None:
         raise NotImplementedError

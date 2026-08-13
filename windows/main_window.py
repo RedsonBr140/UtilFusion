@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
     def cotar_site_concorrente(self):
         from windows.cotar_site_concorrente_window import CotarSiteConcorrenteWindow
 
-        window = CotarSiteConcorrenteWindow(self.context)
+        window = CotarSiteConcorrenteWindow(self.context, self.settings)
         self.mdi.addSubWindow(window)
         window.show()
 

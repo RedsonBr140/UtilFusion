@@ -19,7 +19,7 @@ class ConfigWindow(AppSubWindow):
         self.context = context
         self.settings = settings
         self.setWindowTitle("Configurações")
-        self.setMinimumSize(420, 420)
+        self.setMinimumSize(420, 560)
 
         widget = QWidget()
         self.setWidget(widget)
@@ -61,6 +61,27 @@ class ConfigWindow(AppSubWindow):
 
         main_layout.addWidget(cisspoder_group)
 
+        # --- OpenAI (ChatGPT) ---
+        openai_group = QGroupBox("OpenAI (ChatGPT)")
+        openai_layout = QFormLayout(openai_group)
+        openai_layout.setSpacing(6)
+        openai_layout.setContentsMargins(12, 16, 12, 12)
+
+        self.openai_key = QLineEdit()
+        self.openai_key.setEchoMode(QLineEdit.Password)
+        self.openai_key.setPlaceholderText("sk-...")
+        openai_layout.addRow("API Key:", self.openai_key)
+
+        self.openai_model = QLineEdit()
+        self.openai_model.setPlaceholderText("Ex: gpt-4o-mini")
+        openai_layout.addRow("Modelo:", self.openai_model)
+
+        self.test_openai_btn = QPushButton("Testar API Key")
+        self.test_openai_btn.clicked.connect(self._test_openai)
+        openai_layout.addRow("", self.test_openai_btn)
+
+        main_layout.addWidget(openai_group)
+
         # --- Banco de Dados CompanyKit ---
         companykit_group = QGroupBox("Banco de Dados CompanyKit")
         companykit_layout = QVBoxLayout(companykit_group)
@@ -96,6 +117,9 @@ class ConfigWindow(AppSubWindow):
         self.cisspoder_user.setText(config.username)
         self.cisspoder_password.setText(config.password)
 
+        self.openai_key.setText(self.settings.getOpenAIKey())
+        self.openai_model.setText(self.settings.getOpenAIModel())
+
     def _save(self):
         repo = self.context.cisspoder_config
         config = CisspoderConfig(
@@ -106,6 +130,9 @@ class ConfigWindow(AppSubWindow):
             password=self.cisspoder_password.text(),
         )
         repo.save(config)
+        self.settings.setOpenAIKey(self.openai_key.text().strip())
+        self.settings.setOpenAIModel(self.openai_model.text().strip() or "gpt-4o-mini")
+        self.settings.settings.sync()
         QMessageBox.information(
             self,
             "Configuração",
@@ -117,6 +144,31 @@ class ConfigWindow(AppSubWindow):
         from windows.configurar_url_window import ConfigurarURLWindow
         dlg = ConfigurarURLWindow(self.context, self.settings)
         dlg.exec()
+
+    def _test_openai(self):
+        from services.llm_client import LLMClient
+
+        api_key = self.openai_key.text().strip()
+        if not api_key:
+            QMessageBox.warning(self, "OpenAI", "Informe a API Key primeiro.")
+            return
+
+        llm = LLMClient(api_key, self.openai_model.text().strip() or "gpt-4o-mini")
+        result = llm.rewrite_query("QUARTZOLIT ARGAMASSA AC-I 20KG INTERNA")
+        if result is None:
+            QMessageBox.critical(
+                self,
+                "OpenAI",
+                "Falha ao testar a API Key.\nVerifique a chave e o modelo.",
+            )
+            return
+        QMessageBox.information(
+            self,
+            "OpenAI",
+            f"Conexão realizada com sucesso!\n\n"
+            f"Exemplo de reescrita:\n"
+            f"'QUARTZOLIT ARGAMASSA AC-I 20KG INTERNA'\n-> '{result}'",
+        )
 
     def _test_cisspoder(self):
         host = self.cisspoder_host.text().strip()

@@ -29,3 +29,13 @@ class CisspoderConfig:
     database_name: str
     username: str
     password: str
+
+
+@dataclass
+class Concorrente:
+    id: int
+    nome: str
+    id_erp: int
+    tipo: str
+    active: bool = True
+    created_at: datetime | None = None

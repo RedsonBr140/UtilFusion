@@ -40,11 +40,11 @@ class Ui_LoginWindow(object):
         self.BannerVLayout = QVBoxLayout(self.verticalLayoutWidget)
         self.BannerVLayout.setObjectName(u"BannerVLayout")
         self.BannerVLayout.setContentsMargins(0, 0, 0, 0)
-        self.UtilFusionBanner = QLabel(self.verticalLayoutWidget)
-        self.UtilFusionBanner.setObjectName(u"UtilFusionBanner")
-        self.UtilFusionBanner.setPixmap(QPixmap(u"ui/res/LoginBanner.png"))
+        self.CompanyKitBanner = QLabel(self.verticalLayoutWidget)
+        self.CompanyKitBanner.setObjectName(u"CompanyKitBanner")
+        self.CompanyKitBanner.setPixmap(QPixmap(u"ui/res/LoginBanner.png"))
 
-        self.BannerVLayout.addWidget(self.UtilFusionBanner)
+        self.BannerVLayout.addWidget(self.CompanyKitBanner)
 
         self.UsuarioLineEdit = QLineEdit(LoginWindow)
         self.UsuarioLineEdit.setObjectName(u"UsuarioLineEdit")
@@ -74,8 +74,8 @@ class Ui_LoginWindow(object):
     # setupUi
 
     def retranslateUi(self, LoginWindow):
-        LoginWindow.setWindowTitle(QCoreApplication.translate("LoginWindow", u"UtilFusion - Login", None))
-        self.UtilFusionBanner.setText("")
+        LoginWindow.setWindowTitle(QCoreApplication.translate("LoginWindow", u"CompanyKit - Login", None))
+        self.CompanyKitBanner.setText("")
         self.UsuarioLabel.setText(QCoreApplication.translate("LoginWindow", u"Usu\u00e1rio", None))
         self.SenhaLabel.setText(QCoreApplication.translate("LoginWindow", u"Senha", None))
         self.SenhaLineEdit.setInputMask("")

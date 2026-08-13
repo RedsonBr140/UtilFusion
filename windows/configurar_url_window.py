@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from database.connection import Database
 from ui.ui_configurar_url import Ui_ConfigurarURLDialog
+from windows.app_behaviors import apply_standard_behaviors
 
 
 class ConfigurarURLWindow(QDialog):
@@ -22,6 +23,7 @@ class ConfigurarURLWindow(QDialog):
         self.ui.ApplyButton.clicked.connect(self.apply)
         self.ui.RemoveButton.clicked.connect(self.remove)
         self.load_settings()
+        apply_standard_behaviors(self)
         
     def load_settings(self):
         self.ui.UsuarioLineEdit.setText(

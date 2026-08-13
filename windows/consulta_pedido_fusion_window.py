@@ -1,5 +1,4 @@
 from PySide6.QtWidgets import (
-    QMdiSubWindow,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -8,15 +7,16 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QMessageBox,
     QApplication,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
+from windows.app_behaviors import AppSubWindow
 
-class ConsultaPedidoFusionWindow(QMdiSubWindow):
+
+class ConsultaPedidoFusionWindow(AppSubWindow):
     def __init__(self, context):
         super().__init__()
         self.context = context
@@ -54,9 +54,6 @@ class ConsultaPedidoFusionWindow(QMdiSubWindow):
             "Está no Fusion",
             "Pode formar carga",
         ])
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
-        )
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         main_layout.addWidget(self.table)

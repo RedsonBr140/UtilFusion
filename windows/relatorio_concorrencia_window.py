@@ -3,10 +3,8 @@ import time
 import requests
 
 from PySide6.QtWidgets import (
-    QMdiSubWindow,
     QWidget,
     QTableWidgetItem,
-    QHeaderView,
     QMessageBox,
     QApplication,
     QLabel,
@@ -16,9 +14,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from ui.ui_relatorio_concorrencia import Ui_RelatorioConcorrenciaWindow
+from windows.app_behaviors import AppSubWindow
 
 
-class RelatorioConcorrenciaWindow(QMdiSubWindow):
+class RelatorioConcorrenciaWindow(AppSubWindow):
     BASE_URL = "https://menorpreco.notaparana.pr.gov.br/api/v1/produtos"
     LOCATIONS = {
         "Triunfo, PE": ("7nsgky426yt", "26395"),
@@ -36,9 +35,6 @@ class RelatorioConcorrenciaWindow(QMdiSubWindow):
         self.ui.setupUi(widget)
         self.setWidget(widget)
 
-        self.ui.resultadoTable.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
-        )
         self.ui.resultadoTable.setSortingEnabled(True)
 
         self.ui.filtroLayout.insertWidget(0, QLabel("Local:"))

@@ -32,7 +32,7 @@
    <cursorShape>ArrowCursor</cursorShape>
   </property>
   <property name="windowTitle">
-   <string>UtilFusion - Login</string>
+   <string>CompanyKit - Login</string>
   </property>
   <property name="styleSheet">
    <string notr="true">QDialog {
@@ -50,7 +50,7 @@
    </property>
    <layout class="QVBoxLayout" name="BannerVLayout">
     <item>
-     <widget class="QLabel" name="UtilFusionBanner">
+     <widget class="QLabel" name="CompanyKitBanner">
       <property name="text">
        <string/>
       </property>

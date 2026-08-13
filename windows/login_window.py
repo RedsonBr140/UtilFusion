@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QSettings
 
+from windows.app_behaviors import apply_standard_behaviors
+
 
 class _FusionCredentialsDialog(QDialog):
     def __init__(self, username, parent=None):
@@ -45,6 +47,7 @@ class _FusionCredentialsDialog(QDialog):
         layout.addLayout(buttons)
 
         self.password_input.setFocus()
+        apply_standard_behaviors(self)
 
 
 class LoginWindow(QDialog):
@@ -63,6 +66,7 @@ class LoginWindow(QDialog):
             self.ui.SenhaLineEdit.setFocus()
 
         self.ui.LoginButton.clicked.connect(self.handle_login)
+        apply_standard_behaviors(self)
 
     def handle_login(self):
         username = self.ui.UsuarioLineEdit.text()

@@ -1,13 +1,12 @@
 from PySide6.QtWidgets import (
-    QMdiSubWindow,
     QWidget,
     QTableWidgetItem,
-    QHeaderView,
 )
 from ui.ui_filiais import Ui_FiliaisWindow
+from windows.app_behaviors import AppSubWindow
 
 
-class FiliaisWindow(QMdiSubWindow):
+class FiliaisWindow(AppSubWindow):
     def __init__(self, context):
         super().__init__()
         self.context = context
@@ -17,10 +16,6 @@ class FiliaisWindow(QMdiSubWindow):
         self.ui = Ui_FiliaisWindow()
         self.ui.setupUi(widget)
         self.setWidget(widget)
-
-        self.ui.FiliaisTable.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
-        )
 
         self.ui.OkButton.clicked.connect(self._search)
         self.ui.SearchLineEdit.returnPressed.connect(self._search)

@@ -1,5 +1,4 @@
 from PySide6.QtWidgets import (
-    QMdiSubWindow,
     QWidget,
     QVBoxLayout,
     QGroupBox,
@@ -11,9 +10,10 @@ from PySide6.QtWidgets import (
 )
 
 from database.models import CisspoderConfig
+from windows.app_behaviors import AppSubWindow
 
 
-class ConfigWindow(QMdiSubWindow):
+class ConfigWindow(AppSubWindow):
     def __init__(self, context, settings):
         super().__init__()
         self.context = context
@@ -61,16 +61,16 @@ class ConfigWindow(QMdiSubWindow):
 
         main_layout.addWidget(cisspoder_group)
 
-        # --- Banco de Dados UtilFusion ---
-        utilfusion_group = QGroupBox("Banco de Dados UtilFusion")
-        utilfusion_layout = QVBoxLayout(utilfusion_group)
-        utilfusion_layout.setContentsMargins(12, 16, 12, 12)
+        # --- Banco de Dados CompanyKit ---
+        companykit_group = QGroupBox("Banco de Dados CompanyKit")
+        companykit_layout = QVBoxLayout(companykit_group)
+        companykit_layout.setContentsMargins(12, 16, 12, 12)
 
         self.config_db_btn = QPushButton("Configurar Banco de Dados")
         self.config_db_btn.clicked.connect(self._open_db_config)
-        utilfusion_layout.addWidget(self.config_db_btn)
+        companykit_layout.addWidget(self.config_db_btn)
 
-        main_layout.addWidget(utilfusion_group)
+        main_layout.addWidget(companykit_group)
 
         # --- Botões inferiores ---
         main_layout.addStretch()

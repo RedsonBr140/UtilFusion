@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RelatorioConcorrenciaWindow</class>
+ <widget class="QWidget" name="RelatorioConcorrenciaWindow">
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing"><number>8</number></property>
+   <property name="leftMargin"><number>8</number></property>
+   <property name="topMargin"><number>8</number></property>
+   <property name="rightMargin"><number>8</number></property>
+   <property name="bottomMargin"><number>8</number></property>
+   <item>
+    <widget class="QGroupBox" name="filtroGroup">
+     <property name="title"><string>Filtros</string></property>
+     <layout class="QHBoxLayout" name="filtroLayout">
+      <property name="spacing"><number>6</number></property>
+      <item><widget class="QLabel" name="idcotacaoLabel"><property name="text"><string>ID Cotacao:</string></property></widget></item>
+      <item><widget class="QLineEdit" name="idcotacaoInput"><property name="maximumSize"><size><width>50</width><height>16777215</height></size></property></widget></item>
+      <item><widget class="QLabel" name="idempresaLabel"><property name="text"><string>ID Empresa:</string></property></widget></item>
+      <item><widget class="QLineEdit" name="idempresaInput"><property name="maximumSize"><size><width>50</width><height>16777215</height></size></property></widget></item>
+      <item><widget class="QPushButton" name="gerarButton"><property name="text"><string>Gerar Relatorio</string></property></widget></item>
+      <item><spacer name="filtroSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="resultadoTable">
+     <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+     <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+     <column><property name="text"><string>Descricao</string></property></column>
+     <column><property name="text"><string>Custo Gerencial</string></property></column>
+     <column><property name="text"><string>Varejo (Nosso)</string></property></column>
+     <column><property name="text"><string>Atacado (Nosso)</string></property></column>
+     <column><property name="text"><string>Concorrente (API)</string></property></column>
+     <column><property name="text"><string>Preco Conc.</string></property></column>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+</ui>

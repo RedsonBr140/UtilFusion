@@ -28,7 +28,10 @@ class MainWindow(QMainWindow):
         #estoque_menu = menu_bar.addMenu("Estoque")
         utilitarios_menu = menu_bar.addMenu("Utilitários")
         utilitarios_menu.addAction("Consulta Pedido Fusion", self.open_consulta_pedido_fusion)
+        utilitarios_menu.addAction("Consulta Menor Preço", self.open_consulta_menor_preco)
         relatorios_menu = menu_bar.addMenu("&Relatórios")
+        relatorios_menu.addAction("Concorrência", self.open_relatorio_concorrencia)
+        ajuda_menu = menu_bar.addMenu("A&juda")
         ajuda_menu = menu_bar.addMenu("A&juda")
     def open_configurations(self):
         from windows.config_window import ConfigWindow
@@ -47,3 +50,15 @@ class MainWindow(QMainWindow):
         consulta = ConsultaPedidoFusionWindow(self.context)
         self.mdi.addSubWindow(consulta)
         consulta.show()
+
+    def open_consulta_menor_preco(self):
+        from windows.consulta_menor_preco_window import ConsultaMenorPrecoWindow
+        consulta = ConsultaMenorPrecoWindow(self.context)
+        self.mdi.addSubWindow(consulta)
+        consulta.show()
+
+    def open_relatorio_concorrencia(self):
+        from windows.relatorio_concorrencia_window import RelatorioConcorrenciaWindow
+        relatorio = RelatorioConcorrenciaWindow(self.context)
+        self.mdi.addSubWindow(relatorio)
+        relatorio.show()

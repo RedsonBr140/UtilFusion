@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ConsultaMenorPrecoWindow</class>
+ <widget class="QWidget" name="ConsultaMenorPrecoWindow">
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing">
+    <number>10</number>
+   </property>
+   <property name="leftMargin">
+    <number>12</number>
+   </property>
+   <property name="topMargin">
+    <number>12</number>
+   </property>
+   <property name="rightMargin">
+    <number>12</number>
+   </property>
+   <property name="bottomMargin">
+    <number>12</number>
+   </property>
+   <item>
+    <widget class="QGroupBox" name="filtroGroup">
+     <property name="title">
+      <string>Filtros</string>
+     </property>
+     <layout class="QHBoxLayout" name="filtroLayout">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <property name="leftMargin">
+       <number>12</number>
+      </property>
+      <property name="topMargin">
+       <number>10</number>
+      </property>
+      <property name="rightMargin">
+       <number>12</number>
+      </property>
+      <property name="bottomMargin">
+       <number>10</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="idcotacaoLabel">
+        <property name="text">
+         <string>ID Cotação:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="idcotacaoInput">
+        <property name="text">
+         <string>35</string>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>60</width>
+          <height>16777215</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="idconcorrenteLabel">
+        <property name="text">
+         <string>ID Concorrente:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="idconcorrenteInput">
+        <property name="text">
+         <string>36</string>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>60</width>
+          <height>16777215</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="searchButton">
+        <property name="text">
+         <string>Pesquisar</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="atualizarButton">
+        <property name="text">
+         <string>Atualizar Cotação</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="filtroSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="resultadoTable">
+     <property name="editTriggers">
+      <set>QAbstractItemView::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <column>
+      <property name="text">
+       <string>ID</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Cód. Bar</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Desc. Prod.</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Preço Concorrente</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Concorrente</string>
+      </property>
+     </column>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+</ui>

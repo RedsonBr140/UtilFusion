@@ -107,7 +107,6 @@ class ConsultaMenorPrecoWindow(AppSubWindow):
                 "AND pg.IDSUBPRODUTO = ccp.IDSUBPRODUTO "
                 "WHERE IDCOTACAO = ? "
                 "AND IDCONCORRENTE = ? "
-                "AND LENGTH(pg.CODBAR) = 13"
             )
             stmt = ibm_db.prepare(conn, sql)
             ibm_db.bind_param(stmt, 1, idcotacao)

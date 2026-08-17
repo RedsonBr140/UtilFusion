@@ -16,15 +16,22 @@ class LLMClient:
         if not self.available:
             return None
         system = (
-            "Voce e um assistente que converte nomes de produtos do ERP de uma loja "
-            "de materiais de construcao em termos de busca usados pelo site da "
-            "Premocil (premocil.com.br). O site indexa produtos com nomes como: "
-            "'ARGAMASSA QUARTZOLIT AC1 INTERNO 20KG', 'SUVINIL CORANTE VERMELHO "
-            "50ML', 'TINTA FORTNIL ESMALTE F SUPER 3,6L BRANCO FOSCO'. "
-            "Dado um nome do ERP, responda APENAS com a frase de busca em "
-            "MAIUSCULAS, sem aspas e sem pontuacao extra, mantendo marca, tipo de "
-            "produto, codigo/variacao e quantidade quando fizer sentido. Se o nome "
-            "for inutil (ex.: apenas numeros), responda apenas: none"
+            "Voce gera termos de busca para lojas online a partir de nomes de "
+            "produtos de um sistema ERP. Dado um nome de produto, produza a frase "
+            "de busca mais provavel de encontrar aquele produto no site da loja. "
+            "REGRAS: 1) a busca do site indexa palavras individuais, entao escreva "
+            "codigos de produto com espacos entre letras e numeros (ex.: "
+            "'CP II F 32', e NAO 'CPIIF32', 'CPII-F-32' ou 'CPII F32'); 2) remova "
+            "palavras de preenchimento e descritores redundantes (ex.: 'PARAFUSO' "
+            "em 'BUCHA P PARAFUSO', 'MULTIUSO', 'RS'), mas MANTENHA palavras que "
+            "distinguem produtos (ex.: 'COM ANEL' vs 'SEM ANEL'); 3) conserve os "
+            "termos mais distintivos: marca, tipo de produto e a variacao principal "
+            "(codigo, tamanho, quantidade quando importa); 4) use o estilo de "
+            "nomenclatura que lojas costumam usar. Responda APENAS com a frase, em "
+            "MAIUSCULAS, sem aspas e sem pontuacao extra. Se o nome for inutil "
+            "(ex.: apenas numeros), responda apenas: none. Exemplos: "
+            "'CIMENTO NACIONAL CPII-F-32 RS 50KG' -> 'CIMENTO NACIONAL CP II F 32 "
+            "50KG'; 'BUCHA P PARAFUSO COM ANEL N 8 MULTIUSO' -> 'BUCHA COM ANEL 8'."
         )
         try:
             resp = self._client.chat.completions.create(
@@ -53,10 +60,17 @@ class LLMClient:
             price_txt = f"R$ {price:.2f}" if isinstance(price, (int, float)) else "?"
             lines.append(f"{c['index']}: {c['name']} ({price_txt})")
         system = (
-            "Voce recebe a descricao de um produto do ERP e uma lista de produtos "
-            "encontrados no site de uma loja. Escolha o produto da lista que "
-            "corresponde ao produto do ERP. Responda apenas com o numero do indice "
-            "(0, 1, 2...) do melhor produto, ou 'none' se nenhum corresponde."
+            "Voce recebe a descricao de um produto de um ERP e uma lista de "
+            "produtos encontrados no site de uma loja online. Escolha o produto da "
+            "lista que corresponde ao produto do ERP. CRITERIOS, nesta ordem: "
+            "1) tipo de produto (substantivo principal) deve ser o mesmo "
+            "(ex.: BUCHA e diferente de PARAFUSO); 2) MARCA deve ser a mesma - se "
+            "a marca do ERP NAO aparecer em nenhum candidato, responda 'none'; "
+            "3) codigo/variacao; 4) quantidade/tamanho. Se nenhum produto da "
+            "lista corresponde de forma razoavel, responda APENAS 'none'. NAO "
+            "adivinhe e NAO escolha por causa de um unico numero em comum. "
+            "Responda apenas com o numero do indice (0, 1, 2...) do melhor "
+            "produto ou 'none'."
         )
         try:
             resp = self._client.chat.completions.create(

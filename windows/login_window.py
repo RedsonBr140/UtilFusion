@@ -81,6 +81,7 @@ class LoginWindow(QDialog):
             return
 
         if username == "test" and password == "test":
+            self.context.current_username = username
             self.settings.setUsername(username)
             self._show_connection_splash()
             self._authenticate_fusion(username, password)
@@ -97,6 +98,7 @@ class LoginWindow(QDialog):
             )
             return
 
+        self.context.current_username = username
         self.settings.setUsername(username)
         self._show_connection_splash()
         self._authenticate_fusion(username, password)

@@ -8,6 +8,7 @@ from context import AppContext
 from database.connection import Database
 from database.repositories.filial_repository import FilialRepository
 from database.repositories.user_repository import UserRepository
+from database.repositories.user_permission_repository import UserPermissionRepository
 from database.repositories.cisspoder_config_repository import CisspoderConfigRepository
 from database.repositories.concorrente_repository import ConcorrenteRepository
 from services.auth_service import AuthService
@@ -38,6 +39,7 @@ if not settings.getConnectionUrl():
 
 context.database = Database(settings.getConnectionUrl())
 context.users = UserRepository(context.database)
+context.user_permissions = UserPermissionRepository(context.database)
 context.filiais = FilialRepository(context.database)
 context.cisspoder_config = CisspoderConfigRepository(context.database)
 context.concorrentes = ConcorrenteRepository(context.database)

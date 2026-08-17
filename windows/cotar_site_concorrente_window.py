@@ -1,4 +1,6 @@
-from PySide6.QtCore import Qt
+import threading
+
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
 from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import (
     QApplication,
@@ -22,7 +24,121 @@ from services.concorrente_site import get_fetcher
 from windows.app_behaviors import AppSubWindow
 
 
+class _WorkQueue:
+    """Indices das linhas ainda nao processadas, consumidos pelas threads."""
+
+    def __init__(self, indices: list[int]):
+        self._indices = list(indices)
+        self._lock = threading.Lock()
+
+    def next(self) -> int | None:
+        with self._lock:
+            if self._indices:
+                return self._indices.pop(0)
+            return None
+
+
+class _SearchSignals(QObject):
+    row_done = Signal(int)
+    error = Signal(str)
+
+
+class _ConfirmRequest:
+    __slots__ = ("descricao_erp", "nome_candidato", "preco", "score", "event", "answer")
+
+    def __init__(self, descricao_erp, nome_candidato, preco, score):
+        self.descricao_erp = descricao_erp
+        self.nome_candidato = nome_candidato
+        self.preco = preco
+        self.score = score
+        self.event = threading.Event()
+        self.answer = False
+
+
+class _ConfirmBridge(QObject):
+    """Ponte entre as threads de busca e o QMessageBox (que so pode rodar na
+    thread principal). A thread do worker bloqueia ate o usuario responder."""
+
+    _requested = Signal(object)
+
+    def __init__(self, window):
+        super().__init__()
+        self._window = window
+        self._requested.connect(self._handle, Qt.ConnectionType.QueuedConnection)
+
+    def confirm(self, descricao_erp, nome_candidato, preco, score) -> bool:
+        req = _ConfirmRequest(descricao_erp, nome_candidato, preco, score)
+        self._requested.emit(req)
+        req.event.wait()
+        return req.answer
+
+    def _handle(self, req: _ConfirmRequest):
+        req.answer = self._window._confirm_match(
+            req.descricao_erp, req.nome_candidato, req.preco, req.score
+        )
+        req.event.set()
+
+
+class _SearchRunnable(QRunnable):
+    """Processa itens de uma cotacao numa thread propria, com seu proprio
+    fetcher (sessao HTTP independente)."""
+
+    def __init__(self, queue, tipo, llm, bridge, rows, signals, fonte_default):
+        super().__init__()
+        self._queue = queue
+        self._tipo = tipo
+        self._llm = llm
+        self._bridge = bridge
+        self._rows = rows
+        self._signals = signals
+        self._fonte_default = fonte_default
+        self.setAutoDelete(True)
+
+    def run(self):
+        try:
+            fetcher = get_fetcher(
+                self._tipo, llm=self._llm, confirm=self._bridge.confirm
+            )
+        except ValueError as e:
+            self._signals.error.emit(str(e))
+            self._drain()
+            return
+
+        while True:
+            idx = self._queue.next()
+            if idx is None:
+                break
+            try:
+                row = self._rows[idx]
+                descricao = row["descricao"]
+                if not descricao or descricao == "—":
+                    row["preco_site"] = None
+                    row["fonte"] = ""
+                else:
+                    result = fetcher.fetch_by_name(descricao, gtin=row["codbar"])
+                    if result and result.preco is not None and result.preco > 0:
+                        row["preco_site"] = result.preco
+                        row["fonte"] = result.fonte or self._fonte_default
+                    else:
+                        row["preco_site"] = None
+                        row["fonte"] = ""
+            except Exception as e:
+                print(f"[Cotar] erro item {idx}: {e}")
+                row["preco_site"] = None
+                row["fonte"] = ""
+            self._signals.row_done.emit(idx)
+
+    def _drain(self):
+        while True:
+            idx = self._queue.next()
+            if idx is None:
+                break
+            self._signals.row_done.emit(idx)
+
+
 class CotarSiteConcorrenteWindow(AppSubWindow):
+    MAX_WORKERS = 4
+
     def __init__(self, context, settings):
         super().__init__()
         self.context = context
@@ -30,6 +146,9 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         self.setWindowTitle("Cotar no site do concorrente")
         self.setMinimumSize(900, 450)
         self._rows = []
+        self._remaining = 0
+        self._signals = None
+        self._bridge = None
 
         widget = QWidget()
         self.setWidget(widget)
@@ -49,6 +168,9 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         self.buscar_site_action.triggered.connect(self._buscar_precos_site)
         toolbar.addAction(self.buscar_site_action)
         main.addWidget(toolbar)
+
+        self.progress_label = QLabel("")
+        main.addWidget(self.progress_label)
 
         filtros = QGroupBox("Filtros")
         filtro_layout = QHBoxLayout(filtros)
@@ -200,7 +322,6 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                 "AND pg.IDSUBPRODUTO = ccp.IDSUBPRODUTO "
                 "WHERE IDCOTACAO = ? "
                 "AND IDCONCORRENTE = ? "
-                "AND LENGTH(pg.CODBAR) = 13"
             )
             stmt = ibm_db.prepare(conn, sql)
             ibm_db.bind_param(stmt, 1, idcotacao)
@@ -269,39 +390,82 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                     self.settings.getOpenAIModel(),
                 )
                 print("[Cotar] ChatGPT configurado para apoiar a busca de nomes")
-            fetcher = get_fetcher(concorrente.tipo, llm=llm)
+            # Valida o tipo do concorrente antes de disparar as threads.
+            get_fetcher(concorrente.tipo)
         except ValueError as e:
             QMessageBox.warning(self, "Cotação", str(e))
             return
 
+        self.buscar_site_action.setEnabled(False)
+        self.search_btn.setEnabled(False)
         self.table.setSortingEnabled(False)
-        for idx, row in enumerate(self._rows):
-            codbar = row["codbar"]
-            descricao = row["descricao"]
-            result = (
-                fetcher.fetch_by_name(descricao, gtin=codbar)
-                if descricao and descricao != "—"
-                else None
-            )
-            if result and result.preco is not None and result.preco > 0:
-                row["preco_site"] = result.preco
-                row["fonte"] = result.fonte or concorrente.nome
-            else:
-                row["preco_site"] = None
-                row["fonte"] = ""
 
-            self._update_table_row(
-                idx,
-                row["item_id"],
-                row["descricao"],
-                self._format_preco(row["preco_varejo"]),
-                self._format_preco(row["preco_site"]),
-                row["fonte"] or "—",
-            )
-            QApplication.processEvents()
+        self._signals = _SearchSignals()
+        self._signals.row_done.connect(self._on_row_done)
+        self._signals.error.connect(self._on_worker_error)
+        self._bridge = _ConfirmBridge(self)
 
+        indices = list(range(len(self._rows)))
+        queue = _WorkQueue(indices)
+        self._remaining = len(indices)
+        self._update_progress_label()
+
+        num_workers = max(1, min(self.MAX_WORKERS, len(indices)))
+        pool = QThreadPool.globalInstance()
+        for _ in range(num_workers):
+            runnable = _SearchRunnable(
+                queue,
+                concorrente.tipo,
+                llm,
+                self._bridge,
+                self._rows,
+                self._signals,
+                concorrente.nome,
+            )
+            pool.start(runnable)
+
+    def _on_row_done(self, idx: int):
+        row = self._rows[idx]
+        self._update_table_row(
+            idx,
+            row["item_id"],
+            row["descricao"],
+            self._format_preco(row["preco_varejo"]),
+            self._format_preco(row["preco_site"]),
+            row["fonte"] or "—",
+        )
+        self._remaining -= 1
+        self._update_progress_label()
+        if self._remaining <= 0:
+            self._finish_search()
+
+    def _on_worker_error(self, message: str):
+        QMessageBox.warning(self, "Cotação", message)
+
+    def _finish_search(self):
         self.table.setSortingEnabled(True)
+        self.search_btn.setEnabled(True)
+        self.progress_label.setText("")
         self._update_actions()
+
+    def _update_progress_label(self):
+        total = len(self._rows)
+        done = total - self._remaining
+        self.progress_label.setText(f"Processando... {done}/{total}")
+
+    def _confirm_match(self, descricao_erp, nome_candidato, preco, score) -> bool:
+        preco_txt = self._format_preco(preco) if isinstance(preco, (int, float)) else "—"
+        reply = QMessageBox.question(
+            self,
+            "Confirmar correspondência",
+            f"Produto ERP:\n{descricao_erp}\n\n"
+            f"Candidato encontrado:\n{nome_candidato}  ({preco_txt})\n\n"
+            f"Score: {score:.2f}\n\n"
+            f"Corresponde?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return reply == QMessageBox.Yes
 
     def _gravar(self):
         idcotacao = self.idcotacao_input.text().strip()

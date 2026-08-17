@@ -20,6 +20,9 @@ class AuthService:
                 "Credenciais inválidas"
             )
 
+        if not user.active:
+            raise Exception("Usuário inativo")
+
         self.passwords.verify(
             user.password_hash,
             password

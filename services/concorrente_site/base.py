@@ -17,7 +17,9 @@ class ProductPrice:
 
 class SiteFetcher(ABC):
     @abstractmethod
-    def fetch_by_name(self, descricao: str, gtin: str | None = None) -> ProductPrice | None:
+    def fetch_by_name(
+        self, descricao: str, gtin: str | None = None
+    ) -> ProductPrice | None:
         raise NotImplementedError
 
 
@@ -78,7 +80,9 @@ class SmartSiteFetcher(SiteFetcher):
 
     # ---------- pipeline principal ----------
 
-    def fetch_by_name(self, descricao: str, gtin: str | None = None) -> ProductPrice | None:
+    def fetch_by_name(
+        self, descricao: str, gtin: str | None = None
+    ) -> ProductPrice | None:
         raw = (descricao or "").strip()
         print(
             f"[{self.FONTE}] fetch_by_name -> descricao='{raw or '(vazia)'}'"
@@ -170,11 +174,15 @@ class SmartSiteFetcher(SiteFetcher):
 
         if best["score"] < 0.55:
             return None
-        if second is not None and best["score"] - second["score"] < self.CONFIDENCE_MARGIN:
+        if (
+            second is not None
+            and best["score"] - second["score"] < self.CONFIDENCE_MARGIN
+        ):
             return None
 
         ref_tokens = {
-            t for t in reference.split()
+            t
+            for t in reference.split()
             if t not in self._UNIT_TOKENS and t not in self._STOPWORDS
         }
         cand_tokens = set(self._normalize(best["name"]).split())
@@ -212,7 +220,10 @@ class SmartSiteFetcher(SiteFetcher):
         )
         idx = self.llm.select_best(
             reference,
-            [{"index": i, "name": c["name"], "preco": c["preco"]} for i, c in enumerate(candidates)],
+            [
+                {"index": i, "name": c["name"], "preco": c["preco"]}
+                for i, c in enumerate(candidates)
+            ],
         )
 
         if idx is None or not (0 <= idx < len(candidates)):
@@ -268,12 +279,45 @@ class SmartSiteFetcher(SiteFetcher):
         return re.sub(r"\s+", " ", text).strip()
 
     _UNIT_TOKENS = {
-        "ML", "L", "G", "KG", "MG", "CM", "MM", "M", "X", "CX", "UN", "UND",
-        "PCT", "PT", "LT", "MT", "M2", "M3",
+        "ML",
+        "L",
+        "G",
+        "KG",
+        "MG",
+        "CM",
+        "MM",
+        "M",
+        "X",
+        "CX",
+        "UN",
+        "UND",
+        "PCT",
+        "PT",
+        "LT",
+        "MT",
+        "M2",
+        "M3",
     }
     _STOPWORDS = {
-        "DE", "DA", "DO", "DAS", "DOS", "COM", "E", "EM", "NO", "NA", "PARA",
-        "POR", "A", "O", "AO", "OS", "AS", "UMA", "UM",
+        "DE",
+        "DA",
+        "DO",
+        "DAS",
+        "DOS",
+        "COM",
+        "E",
+        "EM",
+        "NO",
+        "NA",
+        "PARA",
+        "POR",
+        "A",
+        "O",
+        "AO",
+        "OS",
+        "AS",
+        "UMA",
+        "UM",
     }
 
     @classmethod

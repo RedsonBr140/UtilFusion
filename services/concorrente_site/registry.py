@@ -1,10 +1,12 @@
 from services.concorrente_site.base import SiteFetcher
 from services.concorrente_site.generico import GenericoFetcher
 from services.concorrente_site.premocil import PremocilFetcher
+from services.concorrente_site.tupan import TupanFetcher
 
 _FETCHERS: dict[str, type[SiteFetcher]] = {
     "Generico": GenericoFetcher,
     "Premocil": PremocilFetcher,
+    "Tupan": TupanFetcher,
 }
 
 

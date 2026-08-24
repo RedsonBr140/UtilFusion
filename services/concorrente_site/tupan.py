@@ -28,9 +28,11 @@ class TupanFetcher(SmartSiteFetcher):
     def _parse_candidates(self, html: str, reference: str) -> list[dict]:
         candidates = []
         seen = set()
-        for url, name, preco_raw in re.findall(
-            r'<a\s+href="([^"]*)"[^>]*data-nome="([^"]*)" data-preco="([0-9.]+)"',
+        for url, name, preco_raw, body in re.findall(
+            r'<a\s+href="([^"]*)"[^>]*data-nome="([^"]*)" data-preco="([0-9.]+)"'
+            r"[^>]*>(.*?)</a>",
             html,
+            re.S,
         ):
             name = name.strip()
             try:
@@ -41,13 +43,16 @@ class TupanFetcher(SmartSiteFetcher):
                 continue
             seen.add(name)
 
+            image_match = re.search(r'<img[^>]+src="([^"]+)"', body)
+            image = image_match.group(1).strip() if image_match else ""
+
             score = self._similarity(reference, name)
             print(
                 f"[{self.FONTE}]   card score={score:.2f} "
                 f"preco=R$ {preco:.2f} nome='{name}' url='{url}'"
             )
             candidates.append(
-                {"name": name, "preco": preco, "score": score, "url": url}
+                {"name": name, "preco": preco, "score": score, "url": url, "image": image}
             )
 
         if not candidates:

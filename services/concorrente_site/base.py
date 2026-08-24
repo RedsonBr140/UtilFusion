@@ -14,6 +14,7 @@ class ProductPrice:
     preco: float | None
     fonte: str = ""
     url: str = ""
+    image: str = ""
 
 
 class SiteFetcher(ABC):
@@ -335,12 +336,21 @@ class SmartSiteFetcher(SiteFetcher):
             preco=chosen["preco"],
             fonte=self.FONTE,
             url=chosen.get("url", ""),
+            image=chosen.get("image", ""),
         )
 
     def _ask_user(self, raw: str, chosen: dict) -> bool:
         if self.confirm is None:
             return False
-        return bool(self.confirm(raw, chosen["name"], chosen["preco"], chosen["score"]))
+        return bool(
+            self.confirm(
+                raw,
+                chosen["name"],
+                chosen["preco"],
+                chosen["score"],
+                chosen.get("image", ""),
+            )
+        )
 
     # ---------- normalizacao e similaridade ----------
 
@@ -393,6 +403,37 @@ class SmartSiteFetcher(SiteFetcher):
         "UM",
     }
 
+    # Abreviacoes comuns em nomes do ERP, expandidas para deixar a busca
+    # mais natural (mesmo sem o apoio do ChatGPT).
+    _ABBREVIATIONS = {
+        "PORCEL": "PORCELANATO",
+        "ACR": "ACRILICA",
+        "REV": "REVESTIMENTO",
+        "ARG": "ARGAMASSA",
+        "CIM": "CIMENTO",
+        "CER": "CERAMICA",
+        "REJ": "REJUNTE",
+        "TIN": "TINTA",
+        "PARAF": "PARAFUSO",
+        "BUCH": "BUCHA",
+    }
+
+    @classmethod
+    def _naturalize(cls, normalized: str) -> str:
+        """Transforma uma consulta em algo mais natural: expande abreviacoes e
+        separa codigos colados (ex.: 'CPII' -> 'CP II', 'ACIII' -> 'AC III')."""
+        result = []
+        for tok in normalized.split():
+            tok = cls._ABBREVIATIONS.get(tok, tok)
+            # Separa codigo letra+numero (ex.: 'CPIIF32' -> 'CPIIF 32').
+            pieces = re.findall(r"[A-Z]+|\d+", tok)
+            if len(pieces) > 1:
+                tok = " ".join(pieces)
+            # Separa o numeral romano de siglas do tipo AC/CP (ACII, CPIII...).
+            tok = re.sub(r"\b(AC|CP)(I{1,3}|IV|V)\b", r"\1 \2", tok)
+            result.append(tok)
+        return " ".join(result)
+
     @classmethod
     def _meaningful_query(cls, normalized: str) -> str:
         tokens = normalized.split()
@@ -417,9 +458,12 @@ class SmartSiteFetcher(SiteFetcher):
         usuario) escolher entre os resultados.
         """
         meaningful = cls._meaningful_query(reference)
-        m_tokens = (meaningful or reference).split()
+        natural = cls._naturalize(meaningful) if meaningful else ""
+        m_tokens = (natural or meaningful or reference).split()
 
         variants: list[str] = []
+        if natural and natural != meaningful:
+            variants.append(natural)
         for v in (meaningful, reference):
             if v and v not in variants:
                 variants.append(v)

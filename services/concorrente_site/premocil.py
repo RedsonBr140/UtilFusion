@@ -59,13 +59,16 @@ class PremocilFetcher(SmartSiteFetcher):
             link_match = re.search(r'<a\s+href="([^"]+)"', body)
             url = link_match.group(1).strip() if link_match else ""
 
+            image_match = re.search(r'<img[^>]+src="([^"]+)"', body)
+            image = image_match.group(1).strip() if image_match else ""
+
             score = self._similarity(reference, name)
             print(
                 f"[{self.FONTE}]   card id={pid} score={score:.2f} "
                 f"preco=R$ {price_match.group(1)} nome='{name}' url='{url}'"
             )
             candidates.append(
-                {"name": name, "preco": preco, "score": score, "url": url}
+                {"name": name, "preco": preco, "score": score, "url": url, "image": image}
             )
 
         if not candidates:

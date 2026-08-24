@@ -1,10 +1,12 @@
 import threading
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, QUrl, Signal
-from PySide6.QtGui import QAction, QColor, QDesktopServices
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -44,13 +46,22 @@ class _SearchSignals(QObject):
 
 
 class _ConfirmRequest:
-    __slots__ = ("descricao_erp", "nome_candidato", "preco", "score", "event", "answer")
+    __slots__ = (
+        "descricao_erp",
+        "nome_candidato",
+        "preco",
+        "score",
+        "image",
+        "event",
+        "answer",
+    )
 
-    def __init__(self, descricao_erp, nome_candidato, preco, score):
+    def __init__(self, descricao_erp, nome_candidato, preco, score, image):
         self.descricao_erp = descricao_erp
         self.nome_candidato = nome_candidato
         self.preco = preco
         self.score = score
+        self.image = image
         self.event = threading.Event()
         self.answer = False
 
@@ -66,15 +77,15 @@ class _ConfirmBridge(QObject):
         self._window = window
         self._requested.connect(self._handle, Qt.ConnectionType.QueuedConnection)
 
-    def confirm(self, descricao_erp, nome_candidato, preco, score) -> bool:
-        req = _ConfirmRequest(descricao_erp, nome_candidato, preco, score)
+    def confirm(self, descricao_erp, nome_candidato, preco, score, image="") -> bool:
+        req = _ConfirmRequest(descricao_erp, nome_candidato, preco, score, image)
         self._requested.emit(req)
         req.event.wait()
         return req.answer
 
     def _handle(self, req: _ConfirmRequest):
         req.answer = self._window._confirm_match(
-            req.descricao_erp, req.nome_candidato, req.preco, req.score
+            req.descricao_erp, req.nome_candidato, req.preco, req.score, req.image
         )
         req.event.set()
 
@@ -468,19 +479,69 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         done = total - self._remaining
         self.progress_label.setText(f"Processando... {done}/{total}")
 
-    def _confirm_match(self, descricao_erp, nome_candidato, preco, score) -> bool:
+    def _confirm_match(self, descricao_erp, nome_candidato, preco, score, image="") -> bool:
         preco_txt = self._format_preco(preco) if isinstance(preco, (int, float)) else "—"
-        reply = QMessageBox.question(
-            self,
-            "Confirmar correspondência",
-            f"Produto ERP:\n{descricao_erp}\n\n"
-            f"Candidato encontrado:\n{nome_candidato}  ({preco_txt})\n\n"
-            f"Score: {score:.2f}\n\n"
-            f"Corresponde?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Confirmar correspondência")
+        dialog.setMinimumWidth(420)
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(10)
+
+        info = QLabel(
+            f"<b>Produto ERP:</b><br>{descricao_erp}<br><br>"
+            f"<b>Candidato encontrado:</b><br>{nome_candidato}<br>"
+            f"<b>Preço:</b> {preco_txt} &nbsp;&nbsp; <b>Score:</b> {score:.2f}"
         )
-        return reply == QMessageBox.Yes
+        info.setWordWrap(True)
+        info.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(info)
+
+        if image:
+            img_label = QLabel()
+            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pixmap = self._download_pixmap(image)
+            if pixmap is not None:
+                img_label.setPixmap(
+                    pixmap.scaled(
+                        240,
+                        240,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+                img_label.setToolTip(image)
+            else:
+                img_label.setText("(imagem não disponível)")
+            layout.addWidget(img_label)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Yes | QDialogButtonBox.StandardButton.No
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Yes).setText("Sim, corresponde")
+        buttons.button(QDialogButtonBox.StandardButton.No).setText("Não")
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
+    def _download_pixmap(self, url: str) -> QPixmap | None:
+        try:
+            import requests
+
+            resp = requests.get(
+                url,
+                timeout=8,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+            )
+            resp.raise_for_status()
+            pixmap = QPixmap()
+            if pixmap.loadFromData(resp.content):
+                return pixmap
+        except Exception as e:
+            print(f"[Cotar] falha ao baixar imagem {url}: {e}")
+        return None
 
     def _gravar(self):
         idcotacao = self.idcotacao_input.text().strip()

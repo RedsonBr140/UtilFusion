@@ -19,7 +19,7 @@ from fusion import FusionClient
 from windows.main_window import MainWindow
 
 # If you don't do this, ibm_db will fail to import the DLLs on Windows. This is because the DLLs are not in the PATH, and Python doesn't know where to find them.
-if os.name == "nt":
+if os.name == "nt" and os.getenv("IBM_DB_HOME"):
     os.add_dll_directory(os.getenv("IBM_DB_HOME"))
 # Avoid UnicodeDecodeError on accented DB2 CHAR/VARCHAR fields.
 os.environ.setdefault("DB2CODEPAGE", "1208")

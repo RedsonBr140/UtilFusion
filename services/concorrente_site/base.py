@@ -13,12 +13,13 @@ class ProductPrice:
     descricao: str
     preco: float | None
     fonte: str = ""
+    url: str = ""
 
 
 class SiteFetcher(ABC):
     @abstractmethod
     def fetch_by_name(
-        self, descricao: str, gtin: str | None = None
+        self, descricao: str, gtin: str | None = None, referencia: str | None = None
     ) -> ProductPrice | None:
         raise NotImplementedError
 
@@ -81,7 +82,10 @@ class SmartSiteFetcher(SiteFetcher):
     # ---------- pipeline principal ----------
 
     def fetch_by_name(
-        self, descricao: str, gtin: str | None = None
+        self,
+        descricao: str,
+        gtin: str | None = None,
+        referencia: str | None = None,
     ) -> ProductPrice | None:
         raw = (descricao or "").strip()
         print(
@@ -111,7 +115,21 @@ class SmartSiteFetcher(SiteFetcher):
                 if llm_query:
                     print(f"[{self.FONTE}] ChatGPT sugeriu a busca: '{llm_query}'")
                     if llm_query not in queries:
-                        queries.append(llm_query)
+                        queries.insert(0, llm_query)
+
+                if referencia:
+                    print(
+                        f"[{self.FONTE}] usando ChatGPT para buscar por referencia "
+                        f"'{referencia}'"
+                    )
+                    llm_ref_query = self.llm.rewrite_query(raw, referencia)
+                    if llm_ref_query:
+                        print(
+                            f"[{self.FONTE}] ChatGPT sugeriu busca por referencia: "
+                            f"'{llm_ref_query}'"
+                        )
+                        if llm_ref_query not in queries:
+                            queries.insert(0, llm_ref_query)
 
             # Coleciona o melhor candidato ao longo de todas as buscas e so
             # pergunta ao usuario uma vez, no fim. Uma rejeicao prematura por
@@ -186,10 +204,15 @@ class SmartSiteFetcher(SiteFetcher):
             if t not in self._UNIT_TOKENS and t not in self._STOPWORDS
         }
         cand_tokens = set(self._normalize(best["name"]).split())
-        if ref_tokens and not ref_tokens.issubset(cand_tokens):
+        missing = {
+            t
+            for t in ref_tokens
+            if not any(self._tokens_compatible(t, ct) for ct in cand_tokens)
+        }
+        if ref_tokens and missing:
             print(
                 f"[{self.FONTE}] score {best['score']:.2f} alto mas tokens do ERP ausentes "
-                f"({ref_tokens - cand_tokens}) - nao confiar cegamente"
+                f"({sorted(missing)}) - nao confiar cegamente"
             )
             return None
 
@@ -205,6 +228,9 @@ class SmartSiteFetcher(SiteFetcher):
         top = max(candidates, key=lambda c: c["score"])
 
         if not (self.llm and self.llm.available):
+            if self._brand_conflict(reference, top):
+                self._remember_pending(top)
+                return None
             if top["score"] >= self.MATCH_THRESHOLD:
                 print(
                     f"[{self.FONTE}] MATCH (score={top['score']:.2f}): "
@@ -237,6 +263,14 @@ class SmartSiteFetcher(SiteFetcher):
             return None
 
         chosen = candidates[idx]
+        if self._brand_conflict(reference, chosen):
+            print(
+                f"[{self.FONTE}] ChatGPT escolheu '{chosen['name']}' mas "
+                "faltam termos-chave do ERP (marca) - em espera para confirmacao"
+            )
+            self._remember_pending(chosen)
+            return None
+
         if chosen["score"] >= self.MATCH_THRESHOLD:
             print(
                 f"[{self.FONTE}] MATCH (score={chosen['score']:.2f}): "
@@ -251,6 +285,42 @@ class SmartSiteFetcher(SiteFetcher):
         self._remember_pending(chosen)
         return None
 
+    @staticmethod
+    def _tokens_compatible(a: str, b: str) -> bool:
+        """True se dois tokens representam a mesma palavra, inclusive quando um e
+        abreviacao/prefixo do outro (ex.: PORCEL x PORCELANATO, TURQUES x TURQUESA)."""
+        if a == b:
+            return True
+        if len(a) >= 3 and len(b) >= 3:
+            return a.startswith(b) or b.startswith(a)
+        return False
+
+    def _brand_conflict(self, reference: str, cand: dict) -> bool:
+        """True se o candidato nao contem as palavras-chave (marca, tipo) do ERP.
+        Evita aceitar, sem confirmacao, um produto de marca diferente que apenas
+        compartilha categoria/codigo (ex.: CIMENTO NACIONAL x CIMENTO MIZU)."""
+        ref_tokens = {
+            t
+            for t in reference.split()
+            if len(t) >= 3
+            and t.isalpha()
+            and t not in self._UNIT_TOKENS
+            and t not in self._STOPWORDS
+        }
+        cand_tokens = set(self._normalize(cand["name"]).split())
+        missing = {
+            t
+            for t in ref_tokens
+            if not any(self._tokens_compatible(t, ct) for ct in cand_tokens)
+        }
+        if missing:
+            print(
+                f"[{self.FONTE}] candidato '{cand['name']}' sem termos-chave do ERP "
+                f"({sorted(missing)}) - possivel marca trocada"
+            )
+            return True
+        return False
+
     def _remember_pending(self, chosen: dict) -> None:
         if self._pending is None or chosen["score"] > self._pending["score"]:
             self._pending = chosen
@@ -261,7 +331,10 @@ class SmartSiteFetcher(SiteFetcher):
 
     def _to_product(self, chosen: dict) -> ProductPrice:
         return ProductPrice(
-            descricao=chosen["name"], preco=chosen["preco"], fonte=self.FONTE
+            descricao=chosen["name"],
+            preco=chosen["preco"],
+            fonte=self.FONTE,
+            url=chosen.get("url", ""),
         )
 
     def _ask_user(self, raw: str, chosen: dict) -> bool:
@@ -355,8 +428,10 @@ class SmartSiteFetcher(SiteFetcher):
                 v = " ".join(m_tokens[:n])
                 if v not in variants:
                     variants.append(v)
-        # Categoria sozinha: ultimo recurso estrutural.
-        if m_tokens and m_tokens[0] not in variants:
+        # Categoria sozinha: apenas quando nao ha termos mais especificos,
+        # senao um termo unico ambíguo (ex.: 'PORCEL') retorna produtos de
+        # outras categorias (ex.: soquetes) na busca do site.
+        if len(m_tokens) == 1 and m_tokens[0] not in variants:
             variants.append(m_tokens[0])
 
         print(f"[{cls.FONTE}] variantes de busca: " + " | ".join(variants))

@@ -1,7 +1,7 @@
 import threading
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
-from PySide6.QtGui import QAction, QColor
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, QUrl, Signal
+from PySide6.QtGui import QAction, QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -114,18 +114,26 @@ class _SearchRunnable(QRunnable):
                 if not descricao or descricao == "—":
                     row["preco_site"] = None
                     row["fonte"] = ""
+                    row["url"] = ""
                 else:
-                    result = fetcher.fetch_by_name(descricao, gtin=row["codbar"])
+                    result = fetcher.fetch_by_name(
+                        descricao,
+                        gtin=row["codbar"],
+                        referencia=row["referencia"],
+                    )
                     if result and result.preco is not None and result.preco > 0:
                         row["preco_site"] = result.preco
                         row["fonte"] = result.fonte or self._fonte_default
+                        row["url"] = result.url or ""
                     else:
                         row["preco_site"] = None
                         row["fonte"] = ""
+                        row["url"] = ""
             except Exception as e:
                 print(f"[Cotar] erro item {idx}: {e}")
                 row["preco_site"] = None
                 row["fonte"] = ""
+                row["url"] = ""
             self._signals.row_done.emit(idx)
 
     def _drain(self):
@@ -196,7 +204,7 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         )
         main.addWidget(filtros)
 
-        self.table = QTableWidget(0, 5)
+        self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
             [
                 "ID",
@@ -204,11 +212,13 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                 "Preço Varejo Atual",
                 "Preço Site",
                 "Fonte",
+                "Link",
             ]
         )
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSortingEnabled(True)
+        self.table.cellClicked.connect(self._open_link)
         main.addWidget(self.table)
 
         self.idcotacao_input.returnPressed.connect(self._carregar)
@@ -315,7 +325,8 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                 "ccp.IDSUBPRODUTO, "
                 "pg.CODBAR, "
                 "ccp.VALPRECOVAREJOCONCORRENTE, "
-                "CAST(pg.DESCRRESPRODUTO AS VARCHAR(254)) "
+                "CAST(pg.DESCRRESPRODUTO AS VARCHAR(254)), "
+                "CAST(pg.REFERENCIA AS VARCHAR(254)) "
                 "FROM COTACAO_CONCORRENCIA_PROD ccp "
                 "LEFT JOIN PRODUTO_GRADE pg "
                 "ON pg.IDPRODUTO = ccp.IDPRODUTO "
@@ -341,6 +352,7 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                 preco_varejo_val = self._parse_preco(row_data[3])
                 preco_varejo = self._format_preco(preco_varejo_val)
                 descricao = self._as_str(row_data[4]) or "—"
+                referencia = self._as_str(row_data[5])
 
                 self._rows.append(
                     {
@@ -348,10 +360,12 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                         "idsubproduto": idsubproduto,
                         "item_id": item_id,
                         "codbar": codbar,
+                        "referencia": referencia,
                         "descricao": descricao,
                         "preco_varejo": preco_varejo_val,
                         "preco_site": None,
                         "fonte": "",
+                        "url": "",
                     }
                 )
                 self._add_row(item_id, descricao, preco_varejo, "—", "—")
@@ -433,6 +447,7 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
             self._format_preco(row["preco_varejo"]),
             self._format_preco(row["preco_site"]),
             row["fonte"] or "—",
+            row["url"] or "",
         )
         self._remaining -= 1
         self._update_progress_label()
@@ -567,6 +582,7 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                     self._format_preco(row["preco_varejo"]),
                     self._format_preco(row["preco_site"]),
                     row["fonte"] or "—",
+                    row["url"] or "",
                 )
             self.table.setSortingEnabled(True)
 
@@ -588,12 +604,12 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         self.buscar_site_action.setEnabled(has_rows)
         self.gravar_action.setEnabled(has_site)
 
-    def _add_row(self, item_id, descricao, preco_varejo, preco_site, fonte):
+    def _add_row(self, item_id, descricao, preco_varejo, preco_site, fonte, url=""):
         row = self.table.rowCount()
         self.table.insertRow(row)
-        self._update_table_row(row, item_id, descricao, preco_varejo, preco_site, fonte)
+        self._update_table_row(row, item_id, descricao, preco_varejo, preco_site, fonte, url)
 
-    def _update_table_row(self, row, item_id, descricao, preco_varejo, preco_site, fonte):
+    def _update_table_row(self, row, item_id, descricao, preco_varejo, preco_site, fonte, url=""):
         values = [item_id, descricao, preco_varejo, preco_site, fonte]
         for col, value in enumerate(values):
             cell = QTableWidgetItem(value)
@@ -601,3 +617,21 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
             if col == 3 and value != "—":
                 cell.setForeground(QColor("green"))
             self.table.setItem(row, col, cell)
+
+        link_cell = QTableWidgetItem("Abrir link" if url else "—")
+        link_cell.setTextAlignment(Qt.AlignCenter)
+        if url:
+            link_cell.setData(Qt.UserRole, url)
+            link_cell.setForeground(QColor("blue"))
+            link_cell.setToolTip(url)
+        self.table.setItem(row, 5, link_cell)
+
+    def _open_link(self, row, col):
+        if col != 5:
+            return
+        item = self.table.item(row, col)
+        if item is None:
+            return
+        url = item.data(Qt.UserRole)
+        if url:
+            QDesktopServices.openUrl(QUrl(url))

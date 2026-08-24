@@ -12,33 +12,53 @@ class LLMClient:
     def available(self) -> bool:
         return self._client is not None
 
-    def rewrite_query(self, descricao: str) -> str | None:
+    def rewrite_query(self, descricao: str, referencia: str | None = None) -> str | None:
         if not self.available:
             return None
         system = (
-            "Voce gera termos de busca para lojas online a partir de nomes de "
-            "produtos de um sistema ERP. Dado um nome de produto, produza a frase "
-            "de busca mais provavel de encontrar aquele produto no site da loja. "
-            "REGRAS: 1) a busca do site indexa palavras individuais, entao escreva "
+            "Voce e um comprador experiente de materiais de construcao digitando "
+            "a busca em uma loja online. Dado o nome de um produto no ERP, "
+            "escreva exatamente a frase que um comprador digitaria para achar o "
+            "produto no site da loja.\n"
+            "Quando for fornecida uma REFERENCIA (codigo interno do produto), "
+            "use a REFERENCIA como termo principal da busca, pois e o "
+            "identificador mais confiavel.\n"
+            "REGRAS:\n"
+            "1) SEMPRE inclua a CATEGORIA/tipo do produto como palavra principal "
+            "(ex.: PORCELANATO, PISO, CIMENTO, REVESTIMENTO) e NAO busque apenas "
+            "um termo ambíguo: para 'PORCEL.PAMESA...' busque 'PORCELANATO "
+            "PAMESA...', nunca apenas 'PORCEL';\n"
+            "2) expanda abreviacoes obvias para a palavra completa (ex.: "
+            "PORCEL. -> PORCELANATO, ACR. -> ACRILICA, REV. -> "
+            "REVESTIMENTO);\n"
+            "3) a busca do site indexa palavras individuais, entao escreva "
             "codigos de produto com espacos entre letras e numeros (ex.: "
-            "'CP II F 32', e NAO 'CPIIF32', 'CPII-F-32' ou 'CPII F32'); 2) remova "
-            "palavras de preenchimento e descritores redundantes (ex.: 'PARAFUSO' "
-            "em 'BUCHA P PARAFUSO', 'MULTIUSO', 'RS'), mas MANTENHA palavras que "
-            "distinguem produtos (ex.: 'COM ANEL' vs 'SEM ANEL'); 3) conserve os "
-            "termos mais distintivos: marca, tipo de produto e a variacao principal "
-            "(codigo, tamanho, quantidade quando importa); 4) use o estilo de "
-            "nomenclatura que lojas costumam usar. Responda APENAS com a frase, em "
-            "MAIUSCULAS, sem aspas e sem pontuacao extra. Se o nome for inutil "
-            "(ex.: apenas numeros), responda apenas: none. Exemplos: "
-            "'CIMENTO NACIONAL CPII-F-32 RS 50KG' -> 'CIMENTO NACIONAL CP II F 32 "
-            "50KG'; 'BUCHA P PARAFUSO COM ANEL N 8 MULTIUSO' -> 'BUCHA COM ANEL 8'."
+            "'CP II F 32', e NAO 'CPIIF32' ou 'CPII-F-32');\n"
+            "4) remova palavras de preenchimento e descritores redundantes "
+            "(ex.: 'PARAFUSO' em 'BUCHA P PARAFUSO', 'MULTIUSO', 'RS'), mas "
+            "MANTENHA a marca e a variacao que distingue o produto (cor, "
+            "tamanho, quantidade, codigo);\n"
+            "5) escreva de forma concisa e natural, como um ser humano "
+            "pesquisaria.\n"
+            "Responda APENAS com a frase de busca, em MAIUSCULAS, sem aspas e "
+            "sem pontuacao extra. Se o nome for inutil (ex.: apenas numeros), "
+            "responda apenas: none.\n"
+            "Exemplos:\n"
+            "'CIMENTO NACIONAL CPII-F-32 RS 50KG' -> 'CIMENTO NACIONAL CP II F "
+            "32 50KG'\n"
+            "'PORCEL.PAMESA 58X58 RET (A) JAVA TURQUES' -> 'PORCELANATO PAMESA "
+            "58X58 JAVA TURQUES'\n"
+            "'BUCHA P PARAFUSO COM ANEL N 8 MULTIUSO' -> 'BUCHA COM ANEL 8'."
         )
         try:
+            user_content = descricao
+            if referencia:
+                user_content = f"REFERENCIA: {referencia}\nDESCRICAO: {descricao}"
             resp = self._client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system},
-                    {"role": "user", "content": descricao},
+                    {"role": "user", "content": user_content},
                 ],
                 temperature=0,
                 max_tokens=60,
@@ -60,15 +80,33 @@ class LLMClient:
             price_txt = f"R$ {price:.2f}" if isinstance(price, (int, float)) else "?"
             lines.append(f"{c['index']}: {c['name']} ({price_txt})")
         system = (
-            "Voce recebe a descricao de um produto de um ERP e uma lista de "
-            "produtos encontrados no site de uma loja online. Escolha o produto da "
-            "lista que corresponde ao produto do ERP. CRITERIOS, nesta ordem: "
-            "1) tipo de produto (substantivo principal) deve ser o mesmo "
-            "(ex.: BUCHA e diferente de PARAFUSO); 2) MARCA deve ser a mesma - se "
-            "a marca do ERP NAO aparecer em nenhum candidato, responda 'none'; "
-            "3) codigo/variacao; 4) quantidade/tamanho. Se nenhum produto da "
-            "lista corresponde de forma razoavel, responda APENAS 'none'. NAO "
-            "adivinhe e NAO escolha por causa de um unico numero em comum. "
+            "Voce e um especialista em casamento de produtos entre um sistema ERP "
+            "e uma loja online de materiais de construcao.\n\n"
+            "Duas regras sao OBRIGATORIAS e qualquer violacao delas exige "
+            "responder 'none':\n"
+            "1) MARCA: o produto do site DEVE ter a MESMA marca do ERP. Marcas "
+            "diferentes NAO sao o mesmo produto, mesmo que categoria, codigo e "
+            "tamanho coincidam.\n"
+            "2) CATEGORIA (tipo de produto): o candidato DEVE ser da mesma "
+            "categoria. Nunca escolha um produto de categoria diferente.\n\n"
+            "ERROS CLASSICOS A EVITAR:\n"
+            "- ERP 'CIMENTO NACIONAL CP II F 32 50KG' com candidatos "
+            "'CIMENTO MIZU CP II F 32 50KG' e 'CIMENTO VOTORANTIM CP II F 32 "
+            "50KG': a marca e NACIONAL; como NENHUM candidato contem 'NACIONAL', "
+            "responda 'none'.\n"
+            "- ERP 'PORCELANATO PAMESA 58X58 JAVA TURQUES' com candidato "
+            "'SOQUETE PORCEL E27 SPOT ALCA BR DILUX': SOQUETE e um produto "
+            "eletrico, NAO um porcelanato/piso - mesmo contendo 'PORCEL', a "
+            "categoria e diferente; responda 'none'.\n\n"
+            "CRITERIOS, nesta ordem:\n"
+            "1) MARCA identica (procure o nome da marca do ERP dentro do nome do "
+            "candidato);\n"
+            "2) CATEGORIA/tipo de produto igual (substantivo principal);\n"
+            "3) codigo/variacao;\n"
+            "4) quantidade/tamanho.\n\n"
+            "Se a marca ou a categoria do ERP nao aparecer em nenhum candidato, "
+            "responda APENAS 'none'. Nao adivinhe, nao escolha por causa de um "
+            "unico numero em comum.\n"
             "Responda apenas com o numero do indice (0, 1, 2...) do melhor "
             "produto ou 'none'."
         )

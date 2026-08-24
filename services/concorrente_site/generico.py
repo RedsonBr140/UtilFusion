@@ -5,5 +5,7 @@ class GenericoFetcher(SiteFetcher):
     def __init__(self, *args, **kwargs):
         pass
 
-    def fetch_by_name(self, descricao: str, gtin: str | None = None) -> ProductPrice | None:
+    def fetch_by_name(
+        self, descricao: str, gtin: str | None = None, referencia: str | None = None
+    ) -> ProductPrice | None:
         return None

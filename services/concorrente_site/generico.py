@@ -6,6 +6,10 @@ class GenericoFetcher(SiteFetcher):
         pass
 
     def fetch_by_name(
-        self, descricao: str, gtin: str | None = None, referencia: str | None = None
+        self,
+        descricao: str,
+        gtin: str | None = None,
+        referencia: str | None = None,
+        imagem_erp: str | None = None,
     ) -> ProductPrice | None:
         return None

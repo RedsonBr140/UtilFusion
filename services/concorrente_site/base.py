@@ -20,7 +20,11 @@ class ProductPrice:
 class SiteFetcher(ABC):
     @abstractmethod
     def fetch_by_name(
-        self, descricao: str, gtin: str | None = None, referencia: str | None = None
+        self,
+        descricao: str,
+        gtin: str | None = None,
+        referencia: str | None = None,
+        imagem_erp: str | None = None,
     ) -> ProductPrice | None:
         raise NotImplementedError
 
@@ -46,10 +50,11 @@ class SmartSiteFetcher(SiteFetcher):
     def __init__(self, delay: float = 0.4, llm=None, confirm=None):
         self.delay = delay
         self.llm = llm
-        # confirm(descricao_erp, nome_candidato, preco, score) -> bool
+        # confirm(descricao_erp, nome_candidato, preco, score, image, imagem_erp) -> bool
         self.confirm = confirm
         self._session = None
         self._pending = None
+        self._imagem_erp = ""
 
     # ---------- sessao ----------
 
@@ -87,8 +92,10 @@ class SmartSiteFetcher(SiteFetcher):
         descricao: str,
         gtin: str | None = None,
         referencia: str | None = None,
+        imagem_erp: str | None = None,
     ) -> ProductPrice | None:
         raw = (descricao or "").strip()
+        self._imagem_erp = (imagem_erp or "").strip()
         print(
             f"[{self.FONTE}] fetch_by_name -> descricao='{raw or '(vazia)'}'"
             + (f" gtin={gtin}" if gtin else "")
@@ -349,6 +356,7 @@ class SmartSiteFetcher(SiteFetcher):
                 chosen["preco"],
                 chosen["score"],
                 chosen.get("image", ""),
+                self._imagem_erp,
             )
         )
 

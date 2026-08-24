@@ -52,16 +52,18 @@ class _ConfirmRequest:
         "preco",
         "score",
         "image",
+        "imagem_erp",
         "event",
         "answer",
     )
 
-    def __init__(self, descricao_erp, nome_candidato, preco, score, image):
+    def __init__(self, descricao_erp, nome_candidato, preco, score, image, imagem_erp):
         self.descricao_erp = descricao_erp
         self.nome_candidato = nome_candidato
         self.preco = preco
         self.score = score
         self.image = image
+        self.imagem_erp = imagem_erp
         self.event = threading.Event()
         self.answer = False
 
@@ -77,15 +79,24 @@ class _ConfirmBridge(QObject):
         self._window = window
         self._requested.connect(self._handle, Qt.ConnectionType.QueuedConnection)
 
-    def confirm(self, descricao_erp, nome_candidato, preco, score, image="") -> bool:
-        req = _ConfirmRequest(descricao_erp, nome_candidato, preco, score, image)
+    def confirm(
+        self, descricao_erp, nome_candidato, preco, score, image="", imagem_erp=""
+    ) -> bool:
+        req = _ConfirmRequest(
+            descricao_erp, nome_candidato, preco, score, image, imagem_erp
+        )
         self._requested.emit(req)
         req.event.wait()
         return req.answer
 
     def _handle(self, req: _ConfirmRequest):
         req.answer = self._window._confirm_match(
-            req.descricao_erp, req.nome_candidato, req.preco, req.score, req.image
+            req.descricao_erp,
+            req.nome_candidato,
+            req.preco,
+            req.score,
+            req.image,
+            req.imagem_erp,
         )
         req.event.set()
 
@@ -131,6 +142,7 @@ class _SearchRunnable(QRunnable):
                         descricao,
                         gtin=row["codbar"],
                         referencia=row["referencia"],
+                        imagem_erp=row["imagem_erp"],
                     )
                     if result and result.preco is not None and result.preco > 0:
                         row["preco_site"] = result.preco
@@ -350,6 +362,14 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
             ibm_db.bind_param(stmt, 2, str(concorrente.id_erp))
             ibm_db.execute(stmt)
 
+            img_sql = (
+                "SELECT CAST(PATHIMAGEM AS VARCHAR(512)) "
+                "FROM DBA.PRODUTO_GRADE_IMAGENS "
+                "WHERE IDPRODUTO = ? AND IDSUBPRODUTO = ? "
+                "FETCH FIRST 1 ROW ONLY"
+            )
+            img_stmt = ibm_db.prepare(conn, img_sql)
+
             self._rows.clear()
             self.table.setSortingEnabled(False)
             self.table.setRowCount(0)
@@ -365,6 +385,17 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                 descricao = self._as_str(row_data[4]) or "—"
                 referencia = self._as_str(row_data[5])
 
+                imagem_erp = ""
+                try:
+                    ibm_db.bind_param(img_stmt, 1, str(idproduto))
+                    ibm_db.bind_param(img_stmt, 2, str(idsubproduto))
+                    ibm_db.execute(img_stmt)
+                    img_row = ibm_db.fetch_tuple(img_stmt)
+                    if img_row and img_row[0]:
+                        imagem_erp = self._as_str(img_row[0])
+                except Exception as e:
+                    print(f"[Cotar] erro ao buscar imagem ERP idproduto={idproduto}: {e}")
+
                 self._rows.append(
                     {
                         "idproduto": idproduto,
@@ -373,6 +404,7 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
                         "codbar": codbar,
                         "referencia": referencia,
                         "descricao": descricao,
+                        "imagem_erp": imagem_erp,
                         "preco_varejo": preco_varejo_val,
                         "preco_site": None,
                         "fonte": "",
@@ -479,12 +511,14 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         done = total - self._remaining
         self.progress_label.setText(f"Processando... {done}/{total}")
 
-    def _confirm_match(self, descricao_erp, nome_candidato, preco, score, image="") -> bool:
+    def _confirm_match(
+        self, descricao_erp, nome_candidato, preco, score, image="", imagem_erp=""
+    ) -> bool:
         preco_txt = self._format_preco(preco) if isinstance(preco, (int, float)) else "—"
 
         dialog = QDialog(self)
         dialog.setWindowTitle("Confirmar correspondência")
-        dialog.setMinimumWidth(420)
+        dialog.setMinimumWidth(460)
         layout = QVBoxLayout(dialog)
         layout.setSpacing(10)
 
@@ -497,23 +531,12 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         info.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(info)
 
-        if image:
-            img_label = QLabel()
-            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            pixmap = self._download_pixmap(image)
-            if pixmap is not None:
-                img_label.setPixmap(
-                    pixmap.scaled(
-                        240,
-                        240,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                )
-                img_label.setToolTip(image)
-            else:
-                img_label.setText("(imagem não disponível)")
-            layout.addWidget(img_label)
+        if image or imagem_erp:
+            images_row = QHBoxLayout()
+            images_row.setSpacing(12)
+            images_row.addWidget(self._image_pane("Produto (ERP)", imagem_erp))
+            images_row.addWidget(self._image_pane("Candidato (site)", image))
+            layout.addLayout(images_row)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Yes | QDialogButtonBox.StandardButton.No
@@ -525,6 +548,38 @@ class CotarSiteConcorrenteWindow(AppSubWindow):
         layout.addWidget(buttons)
 
         return dialog.exec() == QDialog.DialogCode.Accepted
+
+    def _image_pane(self, title: str, url: str) -> QWidget:
+        pane = QWidget()
+        pane_layout = QVBoxLayout(pane)
+        pane_layout.setContentsMargins(0, 0, 0, 0)
+        pane_layout.setSpacing(4)
+
+        caption = QLabel(title)
+        caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pane_layout.addWidget(caption)
+
+        img_label = QLabel()
+        img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        img_label.setFixedSize(200, 200)
+        if url:
+            pixmap = self._download_pixmap(url)
+            if pixmap is not None:
+                img_label.setPixmap(
+                    pixmap.scaled(
+                        200,
+                        200,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+                img_label.setToolTip(url)
+            else:
+                img_label.setText("(imagem indisponível)")
+        else:
+            img_label.setText("(sem imagem)")
+        pane_layout.addWidget(img_label)
+        return pane
 
     def _download_pixmap(self, url: str) -> QPixmap | None:
         try:
